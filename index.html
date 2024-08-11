@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Изменение имени пользователя TikTok</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            max-width: 600px;
+            margin: auto;
+        }
+        input, button {
+            display: block;
+            margin-bottom: 10px;
+            padding: 10px;
+            width: 100%;
+        }
+        .inline {
+            display: flex;
+            align-items: center;
+        }
+        .inline input {
+            margin-right: 10px;
+            flex: 1;
+        }
+        .inline button {
+            width: auto;
+        }
+    </style>
+</head>
+<body>
+    <h1>Изменение имени пользователя TikTok</h1>
+    <form id="usernameForm">
+        <div class="inline">
+            <label for="sessionId">ID сеанса:</label>
+            <input type="text" id="sessionId" required>
+            <button type="button" id="checkUsernameButton">Проверить имя пользователя</button>
+        </div>
+        
+        <label for="currentUsername">Текущее имя пользователя:</label>
+        <input type="text" id="currentUsername" disabled>
+        
+        <label for="newUsername">Новое имя пользователя:</label>
+        <input type="text" id="newUsername" required>
+        
+        <button type="submit">Изменить имя пользователя</button>
+        
+        <p id="result"></p>
+    </form>
+
+    <script>
+        async function generateSignature(param, data = '') {
+            const time = Math.floor(Date.now() / 1000);
+            const md5 = str => crypto.subtle.digest('MD5', new TextEncoder().encode(str))
+                .then(hash => Array.from(new Uint8Array(hash))
+                .map(b => b.toString(16).padStart(2, '0')).join(''));
+
+            const md5Hexdigest = await md5(param);
+            const gorgon = Array.from({ length: 8 }, (_, i) => parseInt(md5Hexdigest.slice(2 * i, 2 * i + 2), 16));
+            const signature = '8402' + gorgon.map(x => x.toString(16).padStart(2, '0')).join('');
+
+            return {
+                'X-Gorgon': signature,
+                'X-Khronos': time.toString()
+            };
+        }
+
+        async function getProfile(sessionId) {
+            const deviceId = String(Math.floor(Math.random() * (999999999 - 777777788 + 1)) + 777777788);
+            const iid = String(Math.floor(Math.random() * (999999999 - 777777788 + 1)) + 777777788);
+            const param = `device_id=${deviceId}&iid=${iid}&version_code=34.0.0&language=ru&app_name=lite&app_version=34.0.0&carrier_region=SA&tz_offset=10800`;
+            const url = `https://api16.tiktokv.com/aweme/v1/user/profile/self/?${param}`;
+            
+            const headers = await generateSignature(param);
+            headers['content-type'] = 'application/x-www-form-urlencoded; charset=UTF-8';
+            headers['Cookie'] = `sessionid=${sessionId}`;
+
+            const response = await fetch(url, {
+                method: 'GET',
+                headers: headers
+            });
+            
+            const result = await response.json();
+            return result.user && result.user.unique_id ? result.user.unique_id : 'Не удалось получить имя пользователя';
+        }
+
+        async function changeUsername(sessionId, newUsername) {
+            const deviceId = String(Math.floor(Math.random() * (999999999 - 777777788 + 1)) + 777777788);
+            const iid = String(Math.floor(Math.random() * (999999999 - 777777788 + 1)) + 777777788);
+            const param = `device_id=${deviceId}&iid=${iid}&version_code=34.0.0&language=ru&app_name=lite&app_version=34.0.0&carrier_region=SA&tz_offset=10800`;
+            const url = `https://api16.tiktokv.com/aweme/v1/commit/user/?${param}`;
+            
+            const data = `unique_id=${encodeURIComponent(newUsername)}`;
+            const headers = await generateSignature(param, data);
+            headers['content-type'] = 'application/x-www-form-urlencoded; charset=UTF-8';
+            headers['Cookie'] = `sessionid=${sessionId}`;
+
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: headers,
+                body: data
+            });
+            
+            const result = await response.text();
+            return result.includes("unique_id") ? "Имя пользователя успешно изменено." : `Не удалось изменить имя пользователя: ${result}`;
+        }
+
+        document.getElementById('checkUsernameButton').addEventListener('click', async () => {
+            const sessionId = document.getElementById('sessionId').value;
+            const currentUsername = await getProfile(sessionId);
+            document.getElementById('currentUsername').value = currentUsername;
+        });
+
+        document.getElementById('usernameForm').addEventListener('submit', async (event) => {
+            event.preventDefault();
+            const sessionId = document.getElementById('sessionId').value;
+            const newUsername = document.getElementById('newUsername').value;
+            const result = await changeUsername(sessionId, newUsername);
+            document.getElementById('result').textContent = result;
+        });
+    </script>
+</body>
+</html>
